@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon.ico">
+  <link rel="manifest" href="/site.webmanifest">
+
+  <meta charset="UTF-8">
+  <title>Instance Details</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+    h1 { color: #38bdf8; font-size: 1.4rem; }
+    h2 { color: #38bdf8; font-size: 1.1rem; margin-top: 30px; }
+    a.back { color: #94a3b8; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #334155; vertical-align: top; }
+    th { color: #38bdf8; width: 180px; font-weight: normal; }
+    #status { color: #94a3b8; }
+    .noData { color: #94a3b8; }
+
+    .action-badge {
+      display: inline-block;
+      padding: 0.15em 0.55em;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.95em;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .action-badge:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .action-start  { background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.4); }
+    .action-stop   { background: rgba(231, 76, 60, 0.15);  color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.4); }
+    .action-reboot { background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243, 156, 18, 0.4); }
+
+    #actionStatus { color: #94a3b8; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <a class="back" href="index.html">&larr; Back to all instances</a>
+  <h1 id="title">Instance Details</h1>
+  <p id="status">Loading...</p>
+
+  <section class="project-blurb">
+    <p>
+      <button id="startBtn"  class="action-badge action-start"  onclick="performAction('start')">start</button>&nbsp;
+      <button id="stopBtn"   class="action-badge action-stop"   onclick="performAction('stop')">stop</button>&nbsp;
+      <button id="rebootBtn" class="action-badge action-reboot" onclick="performAction('reboot')">reboot</button>
+      <span id="actionStatus"></span>
+    </p>
+  </section>
+
+  <table id="detailTable" style="display:none;"><tbody id="detailBody"></tbody></table>
+
+  <div id="chartSection" style="display:none;">
+    <h2>CPU Utilization (Last Hour)</h2>
+    <canvas id="cpuChart" height="80"></canvas>
+
+    <h2>Network Traffic (Last Hour)</h2>
+    <canvas id="networkChart" height="80"></canvas>
+  </div>
+
+  <script>
+    var API_BASE = "https://l9g4tooe3d.execute-api.us-east-1.amazonaws.com/instances";
+
+    var params = new URLSearchParams(window.location.search);
+    var instanceId = params.get('id');
+
+    const PROTECTED_INSTANCE_ID = "i-04bb08c3e32d1df3b";
+
+    function applyProtection(currentInstanceId) {
+      if (currentInstanceId === PROTECTED_INSTANCE_ID) {
+        var stopBtn = document.getElementById("stopBtn");
+        var rebootBtn = document.getElementById("rebootBtn");
+        [stopBtn, rebootBtn].forEach(function (btn) {
+          if (btn) {
+            btn.disabled = true;
+            btn.title = "This instance is protected";
+          }
+        });
+      }
+    }
+
+    function performAction(action) {
+      var confirmMsg = "Are you sure you want to " + action + " this instance?";
+      if (!confirm(confirmMsg)) return;
+
+      var actionStatus = document.getElementById("actionStatus");
+      actionStatus.textContent = "Working...";
+
+      fetch(API_BASE + "/" + instanceId + "/" + action, { method: "POST" })
+        .then(function (response) {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          actionStatus.textContent = data.message || "Done.";
+          setTimeout(function () { location.reload(); }, 3000);
+        })
+        .catch(function (err) {
+          actionStatus.textContent = "Error: " + err.message;
+        });
+    }
+
+    function chartOptions() {
+      return {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#94a3b8' },
+            grid: { color: '#334155' }
+          },
+          x: {
+            ticks: { color: '#94a3b8' },
+            grid: { color: '#334155' }
+          }
+        },
+        plugins: {
+          legend: { labels: { color: '#e2e8f0' } }
+        }
+      };
+    }
+
+    function renderChart(canvasId, metrics, label, color) {
+      var ctx = document.getElementById(canvasId).getContext('2d');
+      var labels = metrics.map(function (m) {
+        return new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      });
+      var data = metrics.map(function (m) { return m.value; });
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: data,
+            borderColor: color,
+            backgroundColor: color + '20',
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: chartOptions()
+      });
+    }
+
+    function renderNetworkChart(inMetrics, outMetrics) {
+      var ctx = document.getElementById('networkChart').getContext('2d');
+      var source = inMetrics.length ? inMetrics : outMetrics;
+      var labels = source.map(function (m) {
+        return new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      });
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Network In (bytes)',
+              data: inMetrics.map(function (m) { return m.value; }),
+              borderColor: '#38bdf8',
+              backgroundColor: '#38bdf820',
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: 'Network Out (bytes)',
+              data: outMetrics.map(function (m) { return m.value; }),
+              borderColor: '#f472b6',
+              backgroundColor: '#f472b620',
+              tension: 0.3,
+              fill: true
+            }
+          ]
+        },
+        options: chartOptions()
+      });
+    }
+
+    function updateButtonStates(state) {
+      var startBtn = document.getElementById("startBtn");
+      var stopBtn = document.getElementById("stopBtn");
+      var rebootBtn = document.getElementById("rebootBtn");
+
+      if (state === "running") {
+        startBtn.disabled = true;
+      } else if (state === "stopped") {
+        stopBtn.disabled = true;
+        rebootBtn.disabled = true;
+      }
+    }
+
+    function loadDetail() {
+      var status = document.getElementById("status");
+      var table = document.getElementById("detailTable");
+      var body = document.getElementById("detailBody");
+      var chartSection = document.getElementById("chartSection");
+
+      if (!instanceId) {
+        status.textContent = "No instance ID provided.";
+        return;
+      }
+
+      document.getElementById("title").textContent = "Instance: " + instanceId;
+
+      // Protection only depends on the ID itself, so this can run right away.
+      applyProtection(instanceId);
+
+      fetch(API_BASE + "/" + instanceId)
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+          }
+          return response.json();
+        })
+        .then(function (data) {
+          var d = data.instance;
+
+          var rows = {
+            "State": d.state,
+            "Instance Type": d.instance_type,
+            "Public IP": d.public_ip || "—",
+            "Private IP": d.private_ip || "—",
+            "Availability Zone": d.availability_zone,
+            "VPC ID": d.vpc_id,
+            "Subnet ID": d.subnet_id,
+            "Launch Time": new Date(d.launch_time).toLocaleString(),
+            "AMI ID": d.ami_id,
+            "Key Pair": d.key_name || "—",
+            "Security Groups": (d.security_groups || []).join(", ") || "—",
+            "EBS Volumes": (d.volumes || []).join(", ") || "—",
+            "Tags": Object.keys(d.tags || {}).map(function (k) {
+              return k + "=" + d.tags[k];
+            }).join(", ") || "—"
+          };
+
+          var rowsHtml = "";
+          for (var label in rows) {
+            if (rows.hasOwnProperty(label)) {
+              rowsHtml += "<tr><th>" + label + "</th><td>" + rows[label] + "</td></tr>";
+            }
+          }
+          body.innerHTML = rowsHtml;
+
+          table.style.display = "table";
+          status.textContent = "";
+
+          updateButtonStates(d.state);
+
+          chartSection.style.display = "block";
+
+          var cpuData = d.cpu_metrics || [];
+          if (cpuData.length > 0) {
+            renderChart('cpuChart', cpuData, 'CPU %', '#38bdf8');
+          } else {
+            document.getElementById("cpuChart").insertAdjacentHTML(
+              'afterend', '<p class="noData">No CPU data available yet.</p>'
+            );
+          }
+
+          var netIn = d.network_in_metrics || [];
+          var netOut = d.network_out_metrics || [];
+          if (netIn.length > 0 || netOut.length > 0) {
+            renderNetworkChart(netIn, netOut);
+          } else {
+            document.getElementById("networkChart").insertAdjacentHTML(
+              'afterend', '<p class="noData">No network data available yet.</p>'
+            );
+          }
+        })
+        .catch(function (err) {
+          status.textContent = "Error loading instance: " + err.message;
+        });
+    }
+
+    loadDetail();
+  </script>
+</body>
+</html>
