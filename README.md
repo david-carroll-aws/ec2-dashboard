@@ -1,5 +1,4 @@
 # EC2 Dashboard
-
 A serverless Lambda that powers a live EC2 dashboard — listing every instance in the account, showing per-instance detail, pulling CloudWatch metrics, and letting you **start / stop / reboot** instances directly from the browser.
 
 Built as a portfolio project to explore the EC2 API, CloudWatch metrics, and a single-Lambda REST-style router.
