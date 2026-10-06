@@ -3,6 +3,8 @@ A serverless Lambda that powers a live EC2 dashboard — listing every instance 
 
 Built as a portfolio project to explore the EC2 API, CloudWatch metrics, and a single-Lambda REST-style router.
 
+http://davidcarroll.cloud/index.html?service=ec2
+
 <img width="1315" height="583" alt="Screenshot 2026-10-03 001505" src="https://github.com/user-attachments/assets/a6a5e379-362b-4e38-a8f9-8088c1308170" />
 <img width="1314" height="576" alt="Screenshot 2026-10-03 001538" src="https://github.com/user-attachments/assets/bb0fa253-ab47-474f-b870-6f9c9cdaa621" />
 <img width="532" height="580" alt="Screenshot 2026-10-03 001801" src="https://github.com/user-attachments/assets/2982bfb8-9249-46f9-af48-105b7e759df1" />
